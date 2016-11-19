@@ -28,6 +28,7 @@
 #include "block_status.h"
 #include "common/lock.h"
 #include "common/error_msg.h"
+#include "common/internal.h"
 
 namespace tfs
 {

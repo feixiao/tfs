@@ -52,7 +52,7 @@ namespace tfs
         int write_data(const common::WriteDataInfo& write_info, const int32_t lease_id, int32_t& version,
             const char* data_buffer, common::UpdateBlockType& repair);
         int erase_data_file(const uint64_t file_number);
-        int close_write_file(const common::CloseFileInfo& close_file_info, int32_t& write_file_size);
+        int close_write_file(const common::CloseFileInfo& close_file_info, const int32_t force_status, int32_t& write_file_size);
         int read_data(const uint32_t block_id, const uint64_t file_id, const int32_t read_offset, const int8_t flag,
             int32_t& real_read_len, char* tmpDataBuffer);
         int read_raw_data(uint32_t block_id, int32_t read_offset, int32_t& real_read_len, char* tmpDataBuffer);

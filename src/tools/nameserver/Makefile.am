@@ -9,7 +9,7 @@ AM_LDFLAGS=-lz -lrt -lpthread -ldl $(READLINE_LIB) -luuid
 bin_PROGRAMS = admintool showsyncoplog rmsyncoplog ssm tfstool performance syncbyfile\
                read_syncoplog_header repair_block_info
 if WITH_TAIR_CACHE
-bin_PROGRAMS += clear_remote_block_cache
+bin_PROGRAMS += remote_block_cache_tool
 endif
 
 LDADD = $(top_builddir)/src/tools/util/libtfstoolsutil.a\
@@ -37,5 +37,5 @@ performance_SOURCES = performance.cpp
 syncbyfile_SOURCES=sync_by_file.cpp
 repair_block_info_SOURCES=repair_block_info.cpp
 if WITH_TAIR_CACHE
-clear_remote_block_cache_SOURCES=clear_remote_block_cache.cpp
+remote_block_cache_tool_SOURCES=remote_block_cache_tool.cpp
 endif

@@ -73,6 +73,17 @@ namespace tfs
       static uint32_t get_lan(uint64_t ipport, uint32_t ipmask);
       static int assign_ip_addr(const char* ifname, const char* ip, const char* mask);
 
+
+      /**
+      * @brief calculate distance between two ip
+      *
+      * @param lip: network byte order ip address
+      * @param rip: network byte order ip address
+      *
+      * @return
+      */
+      static uint32_t calc_distance(const uint32_t lip, const uint32_t rip);
+
       static char* str_to_lower(char* psz_buf);
       static char* str_to_upper(char* psz_buf);
 

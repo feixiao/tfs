@@ -121,6 +121,9 @@ namespace tfs
       int choose_excess_backup_server(ServerCollect*& result, const common::ArrayHelper<ServerCollect*>& sources) const;
 
       int expand_ratio(int32_t& index, const float expand_ratio = 0.1);
+
+      int timeout(const int64_t now);
+
       private:
       DISALLOW_COPY_AND_ASSIGN(ServerManager);
       ServerCollect* get_(const uint64_t server) const;

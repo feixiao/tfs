@@ -64,6 +64,13 @@ namespace tfs
         void set_log_level(const char* level);
         void set_log_file(const char* log_file);
 
+        /**
+         * @brief set local device name to use
+         *
+         * @param network device name to use
+         */
+        void set_local_dev(const char* dev_name);
+
         TfsRetType logout();
 
         // for raw tfs

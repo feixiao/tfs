@@ -126,7 +126,7 @@ namespace tfs
             CacheDirMetaNode* p_dir_node);
 
         int get_return_status(const int status, const int proc_ret);
-        int force_rc(const int32_t need_size);
+        int force_gc(const int32_t need_size);
 
       private:
         char top_dir_name_[10];

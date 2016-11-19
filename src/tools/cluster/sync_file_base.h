@@ -6,7 +6,7 @@
  * published by the Free Software Foundation.
  *
  *
- * Version: $Id: sync_file_base.h 1126 2011-12-07 03:35:00Z chuyu $
+ * Version: $Id: sync_file_base.h 2464 2013-08-06 03:05:23Z chuyu $
  *
  * Authors:
  *   chuyu <chuyu@taobao.com>
@@ -65,6 +65,11 @@ class SyncAction
   void push_back(const ActionInfo& action)
   {
     action_.push_back(action);
+  }
+
+  int32_t size() const
+  {
+    return action_.size();
   }
 
   std::string dump()

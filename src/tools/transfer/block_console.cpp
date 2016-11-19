@@ -320,7 +320,14 @@ int TranBlock::run()
     {
       break;
     }
-    ret = check_integrity();
+    if ((ret = check_integrity()) != TFS_SUCCESS)
+    {
+      break;
+    }
+    if(src_session_->get_ns_addr() == dest_session_->get_ns_addr())//集群内单副本复制成功后要删除源副本
+    {
+      ret = remove_src_ds_block();
+    }
     break;
   }
 
@@ -579,7 +586,7 @@ int TranBlock::recombine_data()
       FileInfo new_info;
       new_info.id_ = finfo.id_;
       new_info.offset_ = dest_content_buf_.getDataLen();
-      new_info.size_ = finfo.size_ + FILEINFO_SIZE;
+      new_info.size_ = finfo.size_ + FILEINFO_SIZE;//get ds 时减去FILEINFO_SIZE
       new_info.usize_ = new_info.size_;
       new_info.modify_time_ = finfo.modify_time_;
       new_info.create_time_ = finfo.create_time_;
@@ -614,34 +621,38 @@ int TranBlock::recombine_data()
 
 int TranBlock::check_dest_blk()
 {
-  SegmentData dest_seg_data;
-  int ret = dest_session_->get_block_info(dest_seg_data, T_READ);
-  VUINT64 dest_ds = dest_seg_data.ds_;
-  if (TFS_SUCCESS == ret)
+  int ret = TFS_SUCCESS;
+  if(src_session_->get_ns_addr() != dest_session_->get_ns_addr())//集群间的迁移需要检查
   {
-    int32_t ds_size = static_cast<int32_t>(dest_ds.size());
-    if (ds_size > 0)
+    SegmentData dest_seg_data;
+    ret = dest_session_->get_block_info(dest_seg_data, T_READ);
+    VUINT64 dest_ds = dest_seg_data.ds_;
+    if (TFS_SUCCESS == ret)
     {
-      TBSYS_LOG(ERROR, "block exists in dest cluster. block list size is %d, blockid: %u", ds_size, seg_data_.seg_info_.block_id_);
-      int i = 0;
-      for (i = 0; i < ds_size; i++)
+      int32_t ds_size = static_cast<int32_t>(dest_ds.size());
+      if (ds_size > 0)
       {
-        if ((ret = rm_block_from_ns(dest_ds[i])) != TFS_SUCCESS)
+        TBSYS_LOG(ERROR, "block exists in dest cluster. block list size is %d, blockid: %u", ds_size, seg_data_.seg_info_.block_id_);
+        int i = 0;
+        for (i = 0; i < ds_size; i++)
         {
-          break;
+          if ((ret = rm_block_from_ns(dest_ds[i])) != TFS_SUCCESS)
+          {
+            break;
+          }
+          if ((ret = rm_block_from_ds(dest_ds[i])) != TFS_SUCCESS)
+          {
+            break;
+          }
         }
-        if ((ret = rm_block_from_ds(dest_ds[i])) != TFS_SUCCESS)
-        {
-          break;
-        }
+        rm_block_from_ns(dest_ds[0]);
       }
-      rm_block_from_ns(dest_ds[0]);
     }
-  }
-  else
-  {
-    ret = TFS_SUCCESS;
-  }
+    else
+    {
+      ret = TFS_SUCCESS;
+    }
+  }//else 集群内的单副本迁移不需要检查
   return ret;
 }
 
@@ -701,11 +712,9 @@ int TranBlock::write_data()
               tbsys::CNetUtil::addrToString(dest_ds_id_).c_str(), seg_data_.seg_info_.block_id_, cur_write_offset);
           ret = TFS_ERROR;
         }
-
         dest_content_buf_.drainData(cur_len);
         block_len = dest_content_buf_.getDataLen();
         cur_write_offset += cur_len;
-        NewClientManager::get_instance().destroy_client(client);
 
         if (NULL == rsp)
         {
@@ -724,6 +733,7 @@ int TranBlock::write_data()
           break;
         }
       }
+      NewClientManager::get_instance().destroy_client(client);
     }
 
     if (TFS_SUCCESS != ret)
@@ -806,7 +816,9 @@ int TranBlock::check_integrity()
             seg_data_.seg_info_.block_id_, vit->get_file_id());
         continue;
       }
-      else if ((fd = TfsClientImpl::Instance()->open(fname_helper.get_name(), NULL, dest_ns_addr_.c_str(), T_READ)) != TFS_SUCCESS)
+      fd = TfsClientImpl::Instance()->open(fname_helper.get_name(), NULL, dest_ns_addr_.c_str(), T_READ);
+      ret = fd >= 0 ? TFS_SUCCESS : fd;
+      if (TFS_SUCCESS != ret)
       {
         TBSYS_LOG(ERROR, "read data from dest fail, blockid: %u, fileid: %"PRI64_PREFIX"u, ret: %d",
             seg_data_.seg_info_.block_id_, vit->get_file_id(), ret);
@@ -860,8 +872,8 @@ int TranBlock::check_integrity()
             }
           }
         }
+        TfsClientImpl::Instance()->close(fd);
       }
-      TfsClientImpl::Instance()->close(fd);
 
       if (TFS_SUCCESS != ret)
       {
@@ -879,10 +891,38 @@ int TranBlock::check_integrity()
     {
       ret = TFS_ERROR;
     }
+    else
+    {
+      TBSYS_LOG(INFO, "blockid: %u write success, ds from %s to %s", seg_data_.seg_info_.block_id_, tbsys::CNetUtil::addrToString(seg_data_.ds_[0]).c_str(), tbsys::CNetUtil::addrToString(dest_ds_id_).c_str());
+    }
   }
 
   return ret;
 }
+
+int TranBlock::remove_src_ds_block()
+{
+  int ret = TFS_SUCCESS;
+  if(src_session_->get_ns_addr() == dest_session_->get_ns_addr() && 1 == seg_data_.ds_.size())
+  {
+    ret = rm_block_from_ds(seg_data_.ds_[0]);
+    if(TFS_SUCCESS != ret)
+    {
+      TBSYS_LOG(ERROR, "remove blockid:%u from source ds:%s failed", seg_data_.seg_info_.block_id_, tbsys::CNetUtil::addrToString(seg_data_.ds_[0]).c_str());
+    }
+    else
+    {
+      TBSYS_LOG(INFO, "remove blockid:%u from source ds:%s success", seg_data_.seg_info_.block_id_, tbsys::CNetUtil::addrToString(seg_data_.ds_[0]).c_str());
+    }
+  }
+  else
+  {
+    ret = TFS_ERROR;
+    TBSYS_LOG(ERROR, "blockid:%u's source ds count more than one, ds list size:%Zd", seg_data_.seg_info_.block_id_, seg_data_.ds_.size());
+  }
+  return ret;
+}
+
 int TranBlock::rm_block_from_ns(uint64_t ds_id)
 {
   int ret = TFS_SUCCESS;
@@ -944,12 +984,12 @@ int TranBlock::rm_block_from_ds(uint64_t ds_id)
       StatusMessage* sm = dynamic_cast<StatusMessage*>(rsp);
       if (STATUS_MESSAGE_OK == sm->get_status())
       {
-        TBSYS_LOG(INFO, "remove block from dest ds success, ds_addr: %s, blockid: %u",
+        TBSYS_LOG(INFO, "remove block from ds success, ds_addr: %s, blockid: %u",
             tbsys::CNetUtil::addrToString(ds_id).c_str(), seg_data_.seg_info_.block_id_);
       }
       else
       {
-        TBSYS_LOG(ERROR, "remove block from dest ds fail, ds_addr: %s, blockid: %u, ret: %d",
+        TBSYS_LOG(ERROR, "remove block from ds fail, ds_addr: %s, blockid: %u, ret: %d",
             tbsys::CNetUtil::addrToString(ds_id).c_str(), seg_data_.seg_info_.block_id_, sm->get_status());
         ret = TFS_ERROR;
       }

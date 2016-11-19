@@ -192,7 +192,7 @@ namespace tfs
       return TFS_SUCCESS;
     }
 
-    int DataManagement::close_write_file(const CloseFileInfo& colse_file_info, int32_t& write_file_size)
+    int DataManagement::close_write_file(const CloseFileInfo& colse_file_info, const int32_t force_status, int32_t& write_file_size)
     {
       uint32_t block_id = colse_file_info.block_id_;
       uint64_t file_id = colse_file_info.file_id_;
@@ -219,6 +219,7 @@ namespace tfs
         data_file_mutex_.unlock();
         return EXIT_DATAFILE_EXPIRE_ERROR;
       }
+      datafile->set_status(force_status);
       datafile->set_last_update();
       datafile->add_ref();
       data_file_mutex_.unlock();

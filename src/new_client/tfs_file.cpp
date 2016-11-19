@@ -416,7 +416,7 @@ int TfsFile::fstat_ex(FileInfo* file_info, const TfsStatType mode)
     do
     {
       ret = stat_process();
-    } while (ret != TFS_SUCCESS && ClientConfig::client_retry_flag_ && --retry_count);
+    } while (ret == EXIT_TIMEOUT_ERROR && ClientConfig::client_retry_flag_ && --retry_count);
 
     // recovery backup
     meta_seg_->file_info_ = save_file_info;

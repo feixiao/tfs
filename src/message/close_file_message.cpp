@@ -20,7 +20,7 @@ namespace tfs
   namespace message
   {
     CloseFileMessage::CloseFileMessage() :
-      option_flag_(0), version_(0), lease_id_(common::INVALID_LEASE_ID)
+      option_flag_(0), version_(0), lease_id_(common::INVALID_LEASE_ID), status_(-1)
     {
       _packetHeader._pcode = common::CLOSE_FILE_MESSAGE;
       memset(&close_file_info_, 0, sizeof(close_file_info_));
@@ -78,6 +78,10 @@ namespace tfs
       {
         BasePacket::parse_special_ds(ds_, version_, lease_id_);
       }
+      if (common::TFS_SUCCESS == iret)
+      {
+        input.get_int32(&status_); // don't check return val
+      }
       return iret;
     }
 
@@ -97,6 +101,7 @@ namespace tfs
       {
         len += common::INT64_SIZE * 3;
       }
+      len += common::INT_SIZE;
       return len;
     }
 
@@ -150,6 +155,10 @@ namespace tfs
       {
         // reparse, avoid push verion&lease again when clone twice;
         BasePacket::parse_special_ds(ds_, version_, lease_id_);
+      }
+      if (common::TFS_SUCCESS == iret)
+      {
+        iret = output.set_int32(status_);
       }
       return iret;
     }

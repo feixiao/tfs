@@ -87,6 +87,7 @@ namespace tfs
       void set_remote_cache_info(const char* remote_cache_master_addr, const char* remote_cache_slave_addr,
              const char* remote_cache_group_name, const int32_t area);
       void insert_remote_block_cache(const char* ns_addr, const uint32_t block_id, const common::VUINT64& ds_list);
+      int query_remote_block_cache(const char* ns_addr, const uint32_t block_id, common::VUINT64& ds_list);
       void remove_remote_block_cache(const char* ns_addr, const uint32_t block_id);
       bool is_hit_remote_cache(const char* ns_addr, const char* tfs_name) const;
 #endif

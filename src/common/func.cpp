@@ -751,6 +751,34 @@ namespace tfs
       }
     }
 
+    uint32_t Func::calc_distance(const uint32_t lip, const uint32_t rip)
+    {
+      uint32_t ip1 = lip;
+      uint32_t ip2 = rip;
+      uint32_t mask = 0xff;
+      uint32_t n1 = 0;
+      uint32_t n2 = 0;
+      for (int i = 0; i < 4; i++)
+      {
+        n1 <<=  8;
+        n2 <<= 8;
+        n1 |= ip1 & mask;
+        n2 |= ip2 & mask;
+        ip1 >>= 8;
+        ip2 >>= 8;
+      }
+      uint32_t result = 0;
+      if (n1 > n2)
+      {
+        result = n1 - n2;
+      }
+      else
+      {
+        result = n2 - n1;
+      }
+      return result;
+    }
+
     int32_t Func::set_bit(int32_t& data, int32_t index)
     {
       return (data |= (1 << index));

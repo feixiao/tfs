@@ -157,6 +157,12 @@ namespace tfs
       tfs_file_info.create_time_ = time(NULL);
       tfs_file_info.crc_ = crc;
 
+      int32_t force_status = datafile->get_status();
+      if (force_status >= 0)
+      {
+        tfs_file_info.flag_ = force_status;
+      }
+
       bool need_update_meta = true, commit_offset = true;
       // commit
       OperType oper_type = C_OPER_UPDATE;
@@ -532,18 +538,16 @@ namespace tfs
       int tmp_flag = 0;
       int tmp_action = action;
 
-      // ugly impl
-      if (action > REVEAL)
+      if (TEST_OVERRIDE_FLAG(action))
       {
-        // get the 5-7th bit
-        tmp_flag = (action >> 4) & 0x7;
-        tmp_action = SYNC;
+        tmp_flag = GET_OVERRIDE_FLAG(action);
+        tmp_action = OVERRIDE;
       }
 
       // 4. dispatch action
       switch (tmp_action)
       {
-      case SYNC:
+      case OVERRIDE:
         if ((finfo.flag_ & FI_DELETED) != (tmp_flag & FI_DELETED))
         {
           if (tmp_flag & FI_DELETED)

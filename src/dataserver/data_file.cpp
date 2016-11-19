@@ -32,6 +32,7 @@ namespace tfs
       fd_ = -1;
       sprintf(tmp_file_name_, "%s/tmp/%"PRI64_PREFIX"u.dat", dynamic_cast<DataService*>(DataService::instance())->get_real_work_dir().c_str(), fn);
       atomic_set(&ref_count_, 0);
+      status_ = -1;
     }
 
     DataFile::DataFile(uint64_t fn, char* path)

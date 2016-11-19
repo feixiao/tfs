@@ -17,7 +17,7 @@
 #define TFS_COMMON_SESSIONUTIL_H_
 
 #include <string>
-
+#include <stdint.h>
 namespace tfs
 {
   namespace common

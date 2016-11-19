@@ -766,6 +766,8 @@ namespace tfs
 
         get_block_manager().timeout(now);
 
+        get_server_manager().timeout(now);
+
         get_block_manager().expand_ratio(block_expand_index);
 
         get_server_manager().expand_ratio(server_expand_index);

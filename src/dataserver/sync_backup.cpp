@@ -489,7 +489,7 @@ namespace tfs
         }
         else
         {
-          TBSYS_LOG(INFO, "tfs mirror remove file success to dest: %s. blockid: %d, fileid: %"PRI64_PREFIX"u, action: %d",
+          TBSYS_LOG(INFO, "tfs mirror remove file success to dest: %s. blockid: %u, fileid: %"PRI64_PREFIX"u, action: %d",
                     dest_addr_, block_id, file_id, action);
         }
       }
@@ -579,7 +579,8 @@ namespace tfs
           if (src_stat.flag_ != dest_stat.flag_)
           {
             int64_t file_size = 0;
-            int action = (src_stat.flag_ << 4);  // sync flag
+            int action = 0;
+            SET_OVERRIDE_FLAG(action, src_stat.flag_);
             ret = tfs_client_->unlink(file_size, fsname.get_name(), NULL, dest_addr_,
                 static_cast<TfsUnlinkType>(action), TFS_FILE_NO_SYNC_LOG);
           }

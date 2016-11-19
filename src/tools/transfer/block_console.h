@@ -107,6 +107,7 @@ class TranBlock
     int write_data();
     int write_index();
     int check_integrity();
+    int remove_src_ds_block();
     int rm_block_from_ns(uint64_t ds_id);
     int rm_block_from_ds(uint64_t ds_id);
 

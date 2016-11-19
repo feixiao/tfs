@@ -6,7 +6,7 @@
  * published by the Free Software Foundation.
  *
  *
- * Version: $Id: sync_file_base.cpp 1542 2012-06-27 02:02:37Z duanfei@taobao.com $
+ * Version: $Id: sync_file_base.cpp 2463 2013-08-06 02:23:41Z chuyu $
  *
  * Authors:
  *   chuyu <chuyu@taobao.com>
@@ -44,7 +44,7 @@ int SyncFileBase::cmp_file_info(const uint32_t block_id, const FileInfo& source_
   string file_name = string(fsname.get_name());
 
   cmp_file_info_ex(file_name, source_buf, sync_action, force, modify_time);
-  TBSYS_LOG(INFO, "cmp file finished. filename: %s, action_set: %s, ret: %d", file_name.c_str(), sync_action.dump().c_str(), ret);
+  TBSYS_LOG(DEBUG, "cmp file finished. filename: %s, action_set: %s, ret: %d", file_name.c_str(), sync_action.dump().c_str(), ret);
   return ret;
 }
 
@@ -57,13 +57,20 @@ int SyncFileBase::cmp_file_info(const string& file_name, SyncAction& sync_action
   ret = get_file_info(src_ns_addr_, file_name, source_buf);
   if (ret != TFS_SUCCESS)
   {
-    TBSYS_LOG(ERROR, "get source file info (%s) failed, ret: %d", file_name.c_str(), ret);
+    if (EXIT_META_NOT_FOUND_ERROR == ret)
+    {
+      TBSYS_LOG(INFO, "source file %s doesn't exist, will not sync", file_name.c_str());
+    }
+    else
+    {
+      TBSYS_LOG(ERROR, "get source file info (%s) failed, ret: %d", file_name.c_str(), ret);
+    }
   }
   else
   {
     cmp_file_info_ex(file_name, source_buf, sync_action, force, modify_time);
   }
-  TBSYS_LOG(INFO, "cmp file finished. filename: %s, action_set: %s, ret: %d", file_name.c_str(), sync_action.dump().c_str(), ret);
+  TBSYS_LOG(DEBUG, "cmp file finished. filename: %s, action_set: %s, ret: %d", file_name.c_str(), sync_action.dump().c_str(), ret);
   return ret;
 }
 
@@ -79,7 +86,7 @@ int SyncFileBase::do_action(const string& file_name, const SyncAction& sync_acti
     ret = do_action_ex(file_name, action);
     if (ret == TFS_SUCCESS)
     {
-      TBSYS_LOG(INFO, "tfs file(%s) do (%d)th action(%d) success", file_name.c_str(), index, action);
+      TBSYS_LOG(DEBUG, "tfs file(%s) do (%d)th action(%d) success", file_name.c_str(), index, action);
       index++;
     }
     else
@@ -95,7 +102,7 @@ int SyncFileBase::do_action(const string& file_name, const SyncAction& sync_acti
         file_name.c_str(), action_vec[sync_action.force_index_], tmp_ret);
     ret = TFS_ERROR;
   }
-  TBSYS_LOG(INFO, "do action finished. file_name: %s", file_name.c_str());
+  TBSYS_LOG(DEBUG, "do action finished. file_name: %s", file_name.c_str());
   return ret;
 }
 
@@ -143,23 +150,23 @@ int SyncFileBase::cmp_file_info_ex(const string& file_name, const TfsFileStat& s
   ret = get_file_info(dest_ns_addr_, file_name, dest_buf);
   if (ret != TFS_SUCCESS)
   {
-    TBSYS_LOG(WARN, "get dest file info failed. filename: %s, ret: %d", file_name.c_str(), ret);
+    TBSYS_LOG(DEBUG, "get dest file info failed. filename: %s, ret: %d", file_name.c_str(), ret);
   }
 
-  TBSYS_LOG(INFO, "file(%s): flag--(%d -> %d), crc--(%u -> %u), size--(%"PRI64_PREFIX"d -> %"PRI64_PREFIX"d)",
+  TBSYS_LOG(DEBUG, "file(%s): flag--(%d -> %d), crc--(%u -> %u), size--(%"PRI64_PREFIX"d -> %"PRI64_PREFIX"d)",
       file_name.c_str(), source_buf.flag_, ((ret == TFS_SUCCESS)? dest_buf.flag_:-1), source_buf.crc_, dest_buf.crc_, source_buf.size_, dest_buf.size_);
 
   // 1. dest file exists and is new file, just skip.
   if (ret == TFS_SUCCESS && dest_buf.modify_time_ > modify_time)
   {
-    TBSYS_LOG(WARN, "dest file(%s) has been modifyed!!! %d->%d", file_name.c_str(), dest_buf.modify_time_, modify_time);
+    TBSYS_LOG(WARN, "dest file(%s) has been modifyed!!! %s->%s", file_name.c_str(), dest_buf.modify_time_, modify_time);
   }
   // 2. source file exists, dest file is not exist or diff from source, rewrite file.
   else if (ret != TFS_SUCCESS || ((dest_buf.size_ != source_buf.size_) || (dest_buf.crc_ != source_buf.crc_))) // dest file exist
   {
     if (ret == TFS_SUCCESS && (! force))
     {
-      TBSYS_LOG(WARN, "crc conflict!! source crc: %d -> dest crc: %d, force: %d", source_buf.crc_, dest_buf.crc_, force);
+      TBSYS_LOG(WARN, "crc conflict!! file_name: %s, source crc: %d -> dest crc: %d, force: %d", file_name.c_str(), source_buf.crc_, dest_buf.crc_, force);
     }
     else
     {
@@ -171,28 +178,25 @@ int SyncFileBase::cmp_file_info_ex(const string& file_name, const TfsFileStat& s
       // if source file has been hided, reveal it and then rewrite
       else if (source_buf.flag_ == 4)
       {
-        sync_action.push_back(UNHIDE_SOURCE);
         sync_action.push_back(WRITE_ACTION);
-        sync_action.push_back(HIDE_SOURCE);
         sync_action.push_back(HIDE_DEST);
-        sync_action.trigger_index_ = 0;
-        sync_action.force_index_ = 2;
       }
-      else if (source_buf.flag_ == 1 && force)
-      {
-        sync_action.push_back(UNDELE_SOURCE);
-        sync_action.push_back(WRITE_ACTION);
-        sync_action.push_back(DELETE_SOURCE);
-        sync_action.push_back(DELETE_DEST);
-        sync_action.trigger_index_ = 0;
-        sync_action.force_index_ = 2;
-      }
+      //else if (source_buf.flag_ == 1 && force)
+      //{
+      //  sync_action.push_back(UNDELE_SOURCE);
+      //  sync_action.push_back(WRITE_ACTION);
+      //  sync_action.push_back(DELETE_SOURCE);
+      //  sync_action.push_back(DELETE_DEST);
+      //  sync_action.trigger_index_ = 0;
+      //  sync_action.force_index_ = 2;
+      //}
     }
   }
   // 3. source file is the same to dest file, but in diff stat
   else if (source_buf.flag_ != dest_buf.flag_)
   {
-    TBSYS_LOG(WARN, "file info flag conflict!! source flag: %d -> dest flag: %d)", source_buf.flag_, dest_buf.flag_);
+    TBSYS_LOG(WARN, "file info flag conflict!! filename: %s, source flag: %d -> dest flag: %d, source modify time: %s -> dest modify time: %s",
+        file_name.c_str(), source_buf.flag_, dest_buf.flag_, Func::time_to_str(source_buf.modify_time_).c_str(), Func::time_to_str(dest_buf.modify_time_).c_str());
     change_stat(source_buf.flag_, dest_buf.flag_, sync_action);
   }
   return TFS_SUCCESS;
@@ -246,35 +250,35 @@ int SyncFileBase::do_action_ex(const string& file_name, const ActionInfo& action
       ret = copy_file(file_name);
       break;
     case HIDE_SOURCE:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), CONCEAL);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), CONCEAL, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     case DELETE_SOURCE:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), DELETE);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), DELETE, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     case UNHIDE_SOURCE:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), REVEAL);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), REVEAL, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     case UNDELE_SOURCE:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), UNDELETE);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, src_ns_addr_.c_str(), UNDELETE, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     case HIDE_DEST:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), CONCEAL);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), CONCEAL, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     case DELETE_DEST:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), DELETE);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), DELETE, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     case UNHIDE_DEST:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), REVEAL);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), REVEAL, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     case UNDELE_DEST:
-      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), UNDELETE);
+      ret = TfsClientImpl::Instance()->unlink(file_size, file_name.c_str(), NULL, dest_ns_addr_.c_str(), UNDELETE, TFS_FILE_NO_SYNC_LOG);
       usleep(20000);
       break;
     default:
@@ -289,7 +293,7 @@ int SyncFileBase::copy_file(const string& file_name)
   char data[MAX_READ_DATA_SIZE];
   int32_t rlen = 0;
 
-  int source_fd = TfsClientImpl::Instance()->open(file_name.c_str(), NULL, src_ns_addr_.c_str(), T_READ);
+  int source_fd = TfsClientImpl::Instance()->open(file_name.c_str(), NULL, src_ns_addr_.c_str(), T_READ | T_FORCE);
   if (source_fd < 0)
   {
     TBSYS_LOG(ERROR, "open source tfsfile fail when copy file, filename: %s", file_name.c_str());

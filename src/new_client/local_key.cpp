@@ -16,7 +16,6 @@
 #include <unistd.h>
 #include "common/directory_op.h"
 #include "common/error_msg.h"
-#include "common/func.h"
 #include "client_config.h"
 #include "fsname.h"
 #include "local_key.h"
@@ -26,6 +25,38 @@ using namespace tfs::client;
 using namespace tfs::common;
 
 const char* tfs::client::LOCAL_KEY_PATH = "/tmp/TFSlocalkeyDIR/";
+
+int32_t SegmentData::get_nearest_ds(uint32_t ip)
+{
+  int32_t min_idx = PRI_DS_NOT_INIT;
+  uint32_t min_dist = 0xffffffff;
+  for (uint32_t i = 0; i < ds_.size(); i++)
+  {
+    uint32_t dist = Func::calc_distance(ip, (ds_[i] & 0xffffffff));
+    if (dist < min_dist)
+    {
+      min_dist = dist;
+      min_idx = i;
+    }
+    TBSYS_LOG(DEBUG, "distance %u, ds %s", dist, Func::addr_to_str(ds_[i], true).c_str());
+  }
+  return min_idx;
+}
+
+void SegmentData::set_pri_ds_index()
+{
+  uint32_t local_ip = LocalResource::get_instance()->local_ip_;
+  if (0 == local_ip)
+  {
+    pri_ds_index_ = seg_info_.file_id_ % ds_.size();
+  }
+  else
+  {
+    pri_ds_index_ = get_nearest_ds(local_ip);
+  }
+  TBSYS_LOG(DEBUG, "block_id: %d, select ds %d, %s", seg_info_.block_id_, pri_ds_index_,
+      Func::addr_to_str(ds_[pri_ds_index_], true).c_str());
+}
 
 LocalKey::LocalKey() : server_id_(0)
 {

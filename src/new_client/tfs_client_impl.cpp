@@ -707,6 +707,29 @@ void TfsClientImpl::insert_remote_block_cache(const char* ns_addr, const uint32_
   }
 }
 
+int TfsClientImpl::query_remote_block_cache(const char* ns_addr, const uint32_t block_id,
+       common::VUINT64& ds_list)
+{
+  int ret = TFS_ERROR;
+  TfsSession *tfs_session = NULL;
+  if (ns_addr != NULL && strlen(ns_addr) > 0)
+  {
+    tfs_session = SESSION_POOL.get(ns_addr);
+  }
+  else
+  {
+    if (NULL != default_tfs_session_)
+    {
+      tfs_session = default_tfs_session_;
+    }
+  }
+  if (NULL != tfs_session)
+  {
+    ret = tfs_session->query_remote_block_cache(block_id, ds_list);
+  }
+  return ret;
+}
+
 void TfsClientImpl::remove_remote_block_cache(const char* ns_addr, const uint32_t block_id)
 {
   TfsSession *tfs_session = NULL;

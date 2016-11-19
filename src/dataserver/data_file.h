@@ -74,6 +74,16 @@ namespace tfs
           return atomic_read(&ref_count_);
         }
 
+        inline int32_t get_status() const
+        {
+          return status_;
+        }
+
+        inline void set_status(const int32_t status)
+        {
+          status_ = status;
+        }
+
       private:
         static const int WRITE_DATA_TMPBUF_SIZE = 2 * 1024 * 1024;
 
@@ -85,6 +95,7 @@ namespace tfs
         int fd_;                // temporary file fd
         char tmp_file_name_[common::MAX_PATH_LENGTH]; // temporary file name
         atomic_t ref_count_;                          // reference count
+        int32_t status_;       // status will directly set to file when close
 
       private:
         DataFile();

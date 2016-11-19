@@ -123,7 +123,7 @@ typedef enum
   UNDELETE = 2,
   CONCEAL = 4,
   REVEAL = 6,
-  SYNC = 126
+  OVERRIDE = 128
 } TfsUnlinkType;
 
 typedef enum

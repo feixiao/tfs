@@ -25,13 +25,15 @@ PHP_FUNCTION(tfs_client_write);
 PHP_FUNCTION(tfs_client_read);
 PHP_FUNCTION(tfs_client_stat);
 PHP_FUNCTION(tfs_client_unlink);
+//PHP_FUNCTION(tfs_client_save_file);
+
 PHP_FUNCTION(tfs_client_fopen);
 PHP_FUNCTION(tfs_client_create_dir);
 PHP_FUNCTION(tfs_client_create_file);
 PHP_FUNCTION(tfs_client_rm_dir);
 PHP_FUNCTION(tfs_client_rm_file);
-PHP_FUNCTION(tfs_client_mv_dir);
-PHP_FUNCTION(tfs_client_mv_file);
+//PHP_FUNCTION(tfs_client_mv_dir);
+//PHP_FUNCTION(tfs_client_mv_file);
 PHP_FUNCTION(tfs_client_pwrite);
 PHP_FUNCTION(tfs_client_pread);
 PHP_FUNCTION(tfs_client_get_app_id);

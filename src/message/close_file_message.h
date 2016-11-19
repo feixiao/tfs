@@ -129,6 +129,16 @@ namespace tfs
           return (lease_id_ != common::INVALID_LEASE_ID);
         }
 
+        inline int32_t get_status() const
+        {
+          return status_;
+        }
+
+        inline void set_status(const int32_t status)
+        {
+          status_ = status;
+        }
+
       protected:
         common::CloseFileInfo close_file_info_;
         common::BlockInfo block_;
@@ -137,6 +147,7 @@ namespace tfs
         int32_t option_flag_;
         mutable int32_t version_;
         mutable uint32_t lease_id_;
+        int32_t status_;
     };
   }
 }

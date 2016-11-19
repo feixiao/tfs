@@ -111,7 +111,7 @@ class WorkThread : public tbutil::Thread
           blk_console_->finish_transfer_block(block_id, ret);
 
           TIMER_END();
-          TBSYS_LOG(INFO, "get transfer param %s, ret: %d, cost time: %"PRI64_PREFIX"d, tran size: %d",
+          TBSYS_LOG(INFO, "transfer block %s, ret: %d, cost time: %"PRI64_PREFIX"d, tran size: %d",
               TFS_SUCCESS == ret ? "succ" : "fail", ret,
               TIMER_DURATION(), tran_block.get_tran_size());
         }

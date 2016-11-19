@@ -57,6 +57,12 @@ namespace __gnu_cxx
 }
 #endif
 
+// Macros used for overriding file flag in unlink call
+// the 5-7bit is used as flag
+#define SET_OVERRIDE_FLAG(x, f) ((x) = (OVERRIDE | (f << 4)))
+#define GET_OVERRIDE_FLAG(x) (((x) >> 4) & 0x7)
+#define TEST_OVERRIDE_FLAG(x) ((x) > REVEAL)
+
 namespace tfs
 {
   namespace common

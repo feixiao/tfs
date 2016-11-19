@@ -15,19 +15,17 @@ extern "C"
 }
 
 #include "php_tfs_client.h"
-#include "fsname.h"
-#include "tfs_rc_client_api.h"
+#include "tfs_client_api.h"
 #include <tbsys.h>
 #include <tbnet.h>
 #include <vector>
 
 using namespace std;
 using namespace tfs::client;
-using namespace tfs::common;
 
 /* True global resources - no need for thread safety here */
 static zend_class_entry *tfs_client_class_entry_ptr;
-static RcClient* gclient;
+static RestClient* gclient;
 
 /* {{{ tfs_client_functions[]
  *
@@ -47,13 +45,15 @@ static zend_function_entry tfs_client_class_functions[] = {
 	PHP_FALIAS(read, tfs_client_read, NULL)
 	PHP_FALIAS(stat, tfs_client_stat, NULL)
 	PHP_FALIAS(unlink, tfs_client_unlink, NULL)
-	PHP_FALIAS(fopen, tfs_client_fopen, NULL)
+	//PHP_FALIAS(save_file, tfs_client_save_file, NULL)
+
+  PHP_FALIAS(fopen, tfs_client_fopen, NULL)
 	PHP_FALIAS(create_dir, tfs_client_create_dir, NULL)
 	PHP_FALIAS(create_file, tfs_client_create_file, NULL)
 	PHP_FALIAS(rm_dir, tfs_client_rm_dir, NULL)
 	PHP_FALIAS(rm_file, tfs_client_rm_file, NULL)
-	PHP_FALIAS(mv_dir, tfs_client_mv_dir, NULL)
-	PHP_FALIAS(mv_file, tfs_client_mv_file, NULL)
+	//PHP_FALIAS(mv_dir, tfs_client_mv_dir, NULL)
+	//PHP_FALIAS(mv_file, tfs_client_mv_file, NULL)
 	PHP_FALIAS(get_app_id, tfs_client_get_app_id, NULL)
 	PHP_FALIAS(pwrite, tfs_client_pwrite, NULL)
 	PHP_FALIAS(pread, tfs_client_pread, NULL)
@@ -127,28 +127,26 @@ PHP_MINFO_FUNCTION(tfs_client)
 }
 /* }}} */
 
-/* {{{ $tfsclient = new tfs_client(const char* rc_ip, const char* app_key, const char* app_ip)
+/* {{{ $tfsclient = new tfs_client(const char* rs_ip, const char* app_key)
  *
  * Constructor for tfs_client class
  */
 PHP_FUNCTION(tfs_client)
 {
-  char* app_ip = NULL;
   char* app_key = NULL;
-  char* rc_ip  = NULL;
-  long app_ip_length = 0;
+  char* rs_ip  = NULL;
   long app_key_length = 0;
-  long rc_ip_length = 0;
-  int32_t ret = zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sss",
-            &rc_ip, &rc_ip_length, &app_key, &app_key_length, &app_ip, &app_ip_length);
+  long rs_ip_length = 0;
+  int32_t ret = zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss",
+            &rs_ip, &rs_ip_length, &app_key, &app_key_length);
   if (FAILURE == ret)
   {
 		php_error(E_WARNING, "tfs_client: can't parse parameters");
   }
   if (SUCCESS == ret)
   {
-    ret = NULL == app_ip || NULL == rc_ip || NULL == app_key
-                  || app_ip_length <= 0 || rc_ip_length <= 0 || app_key_length <= 0 ? FAILURE : SUCCESS;
+    ret = NULL == rs_ip || NULL == app_key
+                  || rs_ip_length <= 0 || app_key_length <= 0 ? FAILURE : SUCCESS;
     if (SUCCESS != ret)
     {
 		  php_error(E_WARNING, "tfs_client: parameters is invalid");
@@ -156,8 +154,8 @@ PHP_FUNCTION(tfs_client)
   }
   if (SUCCESS == ret)
   {
-    gclient = new RcClient();
-    ret = gclient->initialize(rc_ip, app_key, app_ip);
+    gclient = new RestClient();
+    ret = gclient->initialize(rs_ip, app_key);
     if (TFS_SUCCESS != ret)
     {
 		  php_error(E_WARNING, "tfs_client: initialize failed, ret: %d", ret);
@@ -199,11 +197,11 @@ PHP_FUNCTION(tfs_client_open)
   }
   if (SUCCESS == ret)
   {
-    fd = gclient->open(filename, suffix, static_cast<RcClient::RC_MODE>(mode), large, local_key);
+    fd = gclient->open(filename, suffix, static_cast<RestClient::RC_MODE>(mode), large, local_key);
     ret = fd > 0 ? SUCCESS : FAILURE;
     if (SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: open file %s failed, ret: %ld", filename, fd);
+		  php_error(E_WARNING, "tfs_client: open file %s failed, ret: %ld", filename, fd);
     }
   }
   RETURN_LONG(fd);
@@ -237,11 +235,11 @@ PHP_FUNCTION(tfs_client_fopen)
   }
   if (SUCCESS == ret)
   {
-    fd = gclient->open(app_id, uid, filename, static_cast<RcClient::RC_MODE>(mode));
+    fd = gclient->open(app_id, uid, filename, static_cast<RestClient::RC_MODE>(mode));
     ret = fd > 0 ? SUCCESS : FAILURE;
     if (SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: open file %s failed, ret: %ld", filename, fd);
+		  php_error(E_WARNING, "tfs_client: open file %s failed, ret: %ld", filename, fd);
     }
   }
   RETURN_LONG(fd);
@@ -276,7 +274,7 @@ PHP_FUNCTION(tfs_client_close)
     ret = gclient->close(fd, name, MAX_FILE_NAME_LEN);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: close file failed, fd: %ld, ret: %d", fd, ret);
+		  php_error(E_WARNING, "tfs_client: close file failed, fd: %ld, ret: %d", fd, ret);
     }
     else
     {
@@ -321,14 +319,14 @@ PHP_FUNCTION(tfs_client_write)
     ret = ret_length <= 0 ? FAILURE : SUCCESS;
     if (ret_length <= 0)
     {
-		  php_error(E_ERROR, "tfs_client: write data failed, fd: %ld, ret: %ld", fd, ret_length);
+		  php_error(E_WARNING, "tfs_client: write data failed, fd: %ld, ret: %ld", fd, ret_length);
     }
   }
   RETURN_LONG(ret_length);
 }
 /* }}} */
 
-/* {{{ int $tfs_client->read(const int fd);
+/* {{{ int $tfs_client->read(const int fd, const int count);
  * read data form tfs
  */
 PHP_FUNCTION(tfs_client_read)
@@ -403,20 +401,21 @@ PHP_FUNCTION(tfs_client_stat)
   TfsFileStat finfo;
   if (SUCCESS == ret)
   {
-    ret = gclient->fstat(fd, &finfo);
+    ret = gclient->fstat(fd, &finfo, FORCE_STAT);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: stat failed, fd: %ld, ret: %d", fd, ret);
+		  php_error(E_WARNING, "tfs_client: stat failed, fd: %ld, ret: %d", fd, ret);
     }
     ret = ret == TFS_SUCCESS ? SUCCESS  : FAILURE;
   }
   if (SUCCESS == ret)
   {
 	  char tmpStr[128];
-    add_next_index_string(return_value, (char*)(boost::lexical_cast<string>(finfo.size_).c_str()), 1);
-    add_next_index_string(return_value,(char*)(tbsys::CTimeUtil::timeToStr(finfo.modify_time_,tmpStr)), 1);
-    add_next_index_string(return_value,(char*)(tbsys::CTimeUtil::timeToStr(finfo.create_time_,tmpStr)), 1);
-    add_next_index_string(return_value, (char*)(boost::lexical_cast<string>(finfo.crc_).c_str()), 1);
+    add_assoc_string(return_value, "size", (char*)(boost::lexical_cast<string>(finfo.size_).c_str()), 1);
+    add_assoc_string(return_value, "status", (char*)(boost::lexical_cast<string>(finfo.flag_).c_str()), 1);
+    add_assoc_string(return_value, "modify_time", (char*)(tbsys::CTimeUtil::timeToStr(finfo.modify_time_,tmpStr)), 1);
+    add_assoc_string(return_value, "create_time", (char*)(tbsys::CTimeUtil::timeToStr(finfo.create_time_,tmpStr)), 1);
+    add_assoc_string(return_value, "crc", (char*)(boost::lexical_cast<string>(finfo.crc_).c_str()), 1);
   }
   if (SUCCESS != ret)
     RETURN_FALSE;
@@ -461,6 +460,66 @@ PHP_FUNCTION(tfs_client_unlink)
 }
 /* }}} */
 
+/* {{{  $tfs_client->save_file(const char* local_file, const int32_t ret_tfs_name_len,
+ * const char* suffix, const bool is_large)
+ *
+ * Does a tfs_client save file via tfsfile
+ */
+/*PHP_FUNCTION(tfs_client_save_file)
+{
+  char *local_file = NULL;
+  int32_t ret_tfs_name_len = 0;
+  char *suffix = NULL;
+  bool is_large = false;
+
+  long local_file_length = 0;
+  long suffix_length = 0;
+
+  int32_t ret = zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sl|s!b",
+            &local_file, &local_file_length, &ret_tfs_name_len, &suffix, &suffix_length, &is_large);
+  if (FAILURE == ret)
+  {
+		php_error(E_WARNING, "tfs_client: can't parse parameters");
+  }
+
+  if (SUCCESS == ret)
+  {
+    ret = NULL == local_file || ret_tfs_name_len < 19 ?  FAILURE : SUCCESS;
+    if (SUCCESS != ret)
+    {
+		  php_error(E_WARNING, "tfs_client: parameters is invalid");
+    }
+  }
+
+  long off = -1;
+  array_init(return_value);
+  if (SUCCESS == ret)
+  {
+    char* ret_tfs_name = (char*)emalloc(ret_tfs_name_len);
+    ret = NULL == ret_tfs_name ? FAILURE : SUCCESS;
+    if (SUCCESS == ret)
+    {
+      off = gclient->save_file(local_file, ret_tfs_name, ret_tfs_name_len, suffix, is_large);
+      ret = off > 0 ? SUCCESS: FAILURE;
+      if (SUCCESS != ret)
+      {
+		    php_error(E_WARNING, "save file: %s fail", local_file);
+      }
+      else
+      {
+        add_next_index_long(return_value, off);
+        add_next_index_stringl(return_value, ret_tfs_name, off, 1);
+      }
+      efree(ret_tfs_name);
+      ret_tfs_name = NULL;
+    }
+  }
+  if (SUCCESS != ret)
+    add_next_index_long(return_value, off);
+}*/
+/* }}} */
+
+
 /* {{{ $tfs_client->create_dir(const int uid, const char* dir_path)
  * create directory
  */
@@ -488,7 +547,7 @@ PHP_FUNCTION(tfs_client_create_dir)
     ret = gclient->create_dir(uid, dir_path);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: create directory %s failed, ret: %d", dir_path, ret);
+		  php_error(E_WARNING, "tfs_client: create directory %s failed, ret: %d", dir_path, ret);
     }
   }
   RETURN_LONG(ret);
@@ -522,7 +581,7 @@ PHP_FUNCTION(tfs_client_create_file)
     ret = gclient->create_file(uid, file_path);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: create file %s failed, ret: %d", file_path, ret);
+		  php_error(E_WARNING, "tfs_client: create file %s failed, ret: %d", file_path, ret);
     }
   }
   RETURN_LONG(ret);
@@ -556,7 +615,7 @@ PHP_FUNCTION(tfs_client_rm_dir)
     ret = gclient->rm_dir(uid, dir_path);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: remove directory %s failed, ret: %d", dir_path, ret);
+		  php_error(E_WARNING, "tfs_client: remove directory %s failed, ret: %d", dir_path, ret);
     }
   }
   RETURN_LONG(ret);
@@ -590,7 +649,7 @@ PHP_FUNCTION(tfs_client_rm_file)
     ret = gclient->rm_file(uid, file_path);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: remove file %s failed, ret: %d", file_path, ret);
+		  php_error(E_WARNING, "tfs_client: remove file %s failed, ret: %d", file_path, ret);
     }
   }
   RETURN_LONG(ret);
@@ -600,7 +659,7 @@ PHP_FUNCTION(tfs_client_rm_file)
 /* {{{ $tfs_client->mv_dir(const int uid, const char* src_dir_path, const char* dest_dir_path)
  * mv directory
  */
-PHP_FUNCTION(tfs_client_mv_dir)
+/*PHP_FUNCTION(tfs_client_mv_dir)
 {
   char* dir_path = NULL;
   long dir_path_length = 0;
@@ -626,17 +685,17 @@ PHP_FUNCTION(tfs_client_mv_dir)
     ret = gclient->mv_dir(uid, dir_path, dest_dir_path);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: mv directory %s to %s failed, ret: %d", dir_path, dest_dir_path, ret);
+		  php_error(E_WARNING, "tfs_client: mv directory %s to %s failed, ret: %d", dir_path, dest_dir_path, ret);
     }
   }
   RETURN_LONG(ret);
-}
+}*/
 /* }}} */
 
 /* {{{ $tfs_client->mv_file(const int uid, const char* src_file_path, const char* dest_file_path)
  * move file
  */
-PHP_FUNCTION(tfs_client_mv_file)
+/*PHP_FUNCTION(tfs_client_mv_file)
 {
   char* file_path = NULL;
   long file_path_length = 0;
@@ -662,11 +721,11 @@ PHP_FUNCTION(tfs_client_mv_file)
     ret = gclient->mv_dir(uid, file_path, dest_file_path);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: mv file %s to %s failed, ret: %d", file_path, dest_file_path, ret);
+		  php_error(E_WARNING, "tfs_client: mv file %s to %s failed, ret: %d", file_path, dest_file_path, ret);
     }
   }
   RETURN_LONG(ret);
-}
+}*/
 /* }}} */
 
 
@@ -704,7 +763,7 @@ PHP_FUNCTION(tfs_client_pread)
       ret = off > 0 ? SUCCESS: FAILURE;
       if (SUCCESS != ret)
       {
-		    php_error(E_ERROR, "tfs_client: read data failed, fd: %ld ret: %"PRI64_PREFIX"d", fd, off);
+		    php_error(E_WARNING, "tfs_client: read data failed, fd: %ld ret: %"PRI64_PREFIX"d", fd, off);
       }
       else
       {
@@ -749,7 +808,7 @@ PHP_FUNCTION(tfs_client_pwrite)
     ret = gclient->pwrite(fd, data, length, offset);
     if (ret < 0)
     {
-		  php_error(E_ERROR, "tfs_client: write data failed, fd: %ld ret: %ld", fd, ret);
+		  php_error(E_WARNING, "tfs_client: write data failed, fd: %ld ret: %ld", fd, ret);
     }
   }
   RETURN_LONG(ret);
@@ -794,15 +853,18 @@ PHP_FUNCTION(tfs_client_fstat)
     ret = gclient->ls_file(app_id, uid, file_path, info);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: fstat %s failed, ret: %d", file_path, ret);
+		  php_error(E_WARNING, "tfs_client: fstat %s failed, ret: %d", file_path, ret);
     }
     else
     {
       char tmpStr[64];
       array_init(return_value);
-      add_next_index_string(return_value, (char*)(boost::lexical_cast<string>(info.size_).c_str()), 1);
-      add_next_index_string(return_value, (char*)(tbsys::CTimeUtil::timeToStr(info.modify_time_,tmpStr)), 1);
-      add_next_index_string(return_value, (char*)(tbsys::CTimeUtil::timeToStr(info.create_time_,tmpStr)), 1);
+      //add_next_index_string(return_value, (char*)(boost::lexical_cast<string>(info.size_).c_str()), 1);
+      //add_next_index_string(return_value, (char*)(tbsys::CTimeUtil::timeToStr(info.modify_time_,tmpStr)), 1);
+      //add_next_index_string(return_value, (char*)(tbsys::CTimeUtil::timeToStr(info.create_time_,tmpStr)), 1);
+      add_assoc_string(return_value, "size", (char*)(boost::lexical_cast<string>(info.size_).c_str()), 1);
+      add_assoc_string(return_value, "modify_time", (char*)(tbsys::CTimeUtil::timeToStr(info.modify_time_,tmpStr)), 1);
+      add_assoc_string(return_value, "create_time", (char*)(tbsys::CTimeUtil::timeToStr(info.create_time_,tmpStr)), 1);
     }
     ret = ret == TFS_SUCCESS ? SUCCESS : FAILURE;
   }
@@ -840,7 +902,7 @@ PHP_FUNCTION(tfs_client_ls_dir)
     ret = gclient->ls_dir(app_id, uid, file_path, vinfo);
     if (TFS_SUCCESS != ret)
     {
-		  php_error(E_ERROR, "tfs_client: ls %s failed, ret: %d", file_path, ret);
+		  php_error(E_WARNING, "tfs_client: ls %s failed, ret: %d", file_path, ret);
     }
     else
     {
@@ -849,7 +911,8 @@ PHP_FUNCTION(tfs_client_ls_dir)
       std::vector<FileMetaInfo>::const_iterator iter = vinfo.begin();
       for (; iter != vinfo.end(); ++iter)
       {
-        add_next_index_string(return_value, (char*)((*iter).name_.c_str()), 1);
+        add_next_index_string(return_value, (char*)(boost::lexical_cast<string>((*iter).id_).c_str()), 1);
+        add_next_index_string(return_value, (char*)((*iter).name_), 1);
         add_next_index_string(return_value, (char*)(boost::lexical_cast<string>((*iter).size_).c_str()), 1);
         add_next_index_string(return_value, (char*)(boost::lexical_cast<string>((*iter).ver_no_).c_str()), 1);
         add_next_index_string(return_value, (char*)(tbsys::CTimeUtil::timeToStr((*iter).create_time_,tmpStr)), 1);
