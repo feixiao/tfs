@@ -1581,7 +1581,7 @@ namespace tfs
       bool ret = false;
       if (NULL != sub_dir && NULL != parents_dir)
       {
-        char* pos = strstr(sub_dir, parents_dir);
+        const char* pos = strstr(sub_dir, parents_dir);
         if (pos == sub_dir)
         {
           size_t p_len = strlen(parents_dir);

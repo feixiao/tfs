@@ -28,8 +28,10 @@ AC_CHECK_LIB([pthread], [main])
 AC_CHECK_LIB([rt], [main])
 # FIXME: Replace `main' with a function in `-ltcmalloc':
 #AC_CHECK_LIB([tcmalloc], [main])
-
 AC_CHECK_LIB([mysqlclient], [main])
+
+AC_CHECK_LIB([uuid], [main])
+AC_CHECK_LIB([z], [main])
 
 AC_ARG_WITH([tblib-root],
            AS_HELP_STRING([--with-tblib-root],
